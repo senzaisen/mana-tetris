@@ -100,9 +100,13 @@ function canvasTap(px,py){
 // swipe on board: horizontal = move, swipe down = drop, swipe up = pause (tactile)
 let swX=0,swY=0,swT=0,lastDownSwipe=0;
 cv.addEventListener('touchstart',e=>{const t=e.changedTouches[0];swX=t.clientX;swY=t.clientY;swT=Date.now();},{passive:true});
-cv.addEventListener('touchend',e=>{if(G.state!=='play'||G.paused)return;
+let mX=0,mY=0,mT=0;
+cv.addEventListener('mousedown',e=>{mX=e.clientX;mY=e.clientY;mT=Date.now();});
+cv.addEventListener('mouseup',e=>{if(G.state==='play'&&G.paused&&Math.abs(e.clientX-mX)<10&&Math.abs(e.clientY-mY)<10&&Date.now()-mT<400)togglePause();});
+cv.addEventListener('touchend',e=>{if(G.state!=='play')return;
 const r=cv.getBoundingClientRect(),t=e.changedTouches[0];
 const dx=t.clientX-swX,dy=t.clientY-swY;
+if(G.paused){if(Math.abs(dx)<24&&Math.abs(dy)<24&&Date.now()-swT<500)togglePause();return;}
 if(Math.abs(dx)<20&&Math.abs(dy)<20){if(Date.now()-swT<400){const px=(t.clientX-r.left)*cv.width/r.width,py=(t.clientY-r.top)*cv.height/r.height;canvasTap(px,py);}return;}
 if(Math.abs(dx)>Math.abs(dy)){const steps=Math.min(4,Math.floor(Math.abs(dx)/36));for(let i=0;i<steps;i++)tryMove(dx>0?1:-1);}
 else if(dy>0){const now=Date.now();
@@ -193,7 +197,7 @@ function drawTopBar(){
   ctx.fillStyle='#2dd4bf';ctx.font='bold 12px system-ui';
   ctx.fillText('BEST '+G.best+(G.combo>0?' · COMBO x'+G.combo:''),240,98);
   ctx.fillStyle='#9a9ab0';ctx.font='11px system-ui';
-  ctx.fillText('tap ◀ ⟲ · tap ▶ ⟳ · tap piece 180',240,120);
+  ctx.fillText('tap ◀ ⟲ ▶ ⟳ · piece 180 · ↑ pause · tap resumes',240,120);
   ctx.strokeStyle='#26263a';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,142);ctx.lineTo(480,142);ctx.stroke();
 }
 function render(){
