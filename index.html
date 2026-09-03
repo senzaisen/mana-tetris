@@ -111,7 +111,7 @@ addEventListener('blur',()=>keys.clear());
 function togglePause(){if(G.state!=='play')return;G.paused=!G.paused;document.getElementById('tP').textContent=G.paused?'▶':'⏸';}
 document.getElementById('playBtn').onclick=start;
 // touch buttons (hold-to-repeat for left/right/down)
-function bindHold(el,fn){let iv=null;const go=e=>{e.preventDefault();fn();iv=setInterval(fn,110);};const stop=()=>{clearInterval(iv);iv=null;};el.addEventListener('touchstart',go,{passive:false});el.addEventListener('touchend',stop);el.addEventListener('touchcancel',stop);el.addEventListener('mousedown',go);el.addEventListener('mouseup',stop);el.addEventListener('mouseleave',stop);}
+function bindHold(el,fn){let iv=null,lastTouch=0;const go=e=>{e.preventDefault();if(e.type==='touchstart')lastTouch=Date.now();fn();iv=setInterval(fn,110);};const mouseGo=e=>{if(Date.now()-lastTouch<600)return;go(e);};const stop=()=>{clearInterval(iv);iv=null;};el.addEventListener('touchstart',go,{passive:false});el.addEventListener('touchend',stop);el.addEventListener('touchcancel',stop);el.addEventListener('mousedown',mouseGo);el.addEventListener('mouseup',stop);el.addEventListener('mouseleave',stop);}
 bindHold(document.getElementById('tL'),()=>{if(G.state==='play'&&!G.paused)tryMove(-1);});
 bindHold(document.getElementById('tR'),()=>{if(G.state==='play'&&!G.paused)tryMove(1);});
 bindHold(document.getElementById('tDown'),()=>{if(G.state==='play'&&!G.paused&&G.cur&&!collide(G.cur.m,G.cur.x,G.cur.y+1)){G.cur.y++;G.score+=1;}});
