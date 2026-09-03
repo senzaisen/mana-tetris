@@ -100,6 +100,7 @@ function tryRot(){if(!G.cur||G.cur.t==='O')return;const r=rot(G.cur.m);for(const
 function hold(){if(!G.canHold||!G.cur)return;if(!G.hold){G.hold=G.cur.t;spawn();}else{const t=G.hold;G.hold=G.cur.t;G.cur={t,m:SHAPES[t].map(row=>row.slice()),x:3,y:t==='I'?-1:0};if(collide(G.cur.m,G.cur.x,G.cur.y)){gameOver();return;}}G.canHold=false;sfx(400,0.07,'sine');}
 function dropInterval(){return Math.max(70,780-(G.level-1)*70);}
 let AC=null;function sfx(f,d,type){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type=type||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.07,AC.currentTime);g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d);}catch(e){}}
+window.__err='';window.addEventListener('error',e=>{try{window.__err=String((e&&e.message)||'err').slice(0,140);}catch(_){}});
 const keys=new Set();
 addEventListener('keydown',e=>{if(e.repeat)return;keys.add(e.code);const k=e.code;
 if(k==='ArrowLeft')tryMove(-1);else if(k==='ArrowRight')tryMove(1);
@@ -154,9 +155,10 @@ function render(){
   if(G.paused&&G.state==='play'){ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(0,0,480,600);ctx.fillStyle='#fff';ctx.font='bold 34px system-ui';ctx.textAlign='center';ctx.fillText('PAUSED',240,300);}
 }
 let last=0;function loop(ts){const dt=Math.min(0.05,(ts-last)/1000||0.016);last=ts;
+  try{
   if(G.state==='play'&&!G.paused&&G.cur){
     const grounded=collide(G.cur.m,G.cur.x,G.cur.y+1);
-    if(grounded){G.lockT+=dt;if(G.lockT>=0.45){lockPiece();if(G.state!=='play'){render();requestAnimationFrame(loop);return;}}}
+    if(grounded){G.lockT+=dt;if(G.lockT>=0.45){lockPiece();if(G.state!=='play'){try{render();}catch(e){}requestAnimationFrame(loop);return;}}}
     else{G.lockT=0;const iv=(keys.has('ArrowDown')?38:dropInterval())/1000;G.dropAcc+=dt;
       while(G.dropAcc>=iv){G.dropAcc-=iv;if(!collide(G.cur.m,G.cur.x,G.cur.y+1)){G.cur.y++;if(keys.has('ArrowDown'))G.score+=1;}else{lockPiece();if(G.state!=='play')break;}}}
   }
@@ -164,7 +166,11 @@ let last=0;function loop(ts){const dt=Math.min(0.05,(ts-last)/1000||0.016);last=
   G.flash=G.flash.filter(p=>p.l>0);
   for(const p of G.popups){p.y-=28*dt;p.t-=dt;}
   G.popups=G.popups.filter(p=>p.t>0);
-  render();requestAnimationFrame(loop);}
+  }catch(e){try{window.__err='L:'+String(e&&e.message||e).slice(0,120);}catch(_){}}
+  try{render();}catch(e){try{window.__err='R:'+String(e&&e.message||e).slice(0,120);}catch(_){}
+    try{ctx.fillStyle='#0d0d14';ctx.fillRect(0,0,480,600);}catch(_){}}
+  if(window.__err){try{ctx.fillStyle='#ff5555';ctx.font='bold 13px monospace';ctx.textAlign='left';ctx.fillText('ERR '+window.__err,12,20);}catch(_){}}
+  requestAnimationFrame(loop);}
 window.__g={get state(){return G.state},get score(){return G.score},get lines(){return G.lines},get level(){return G.level},start:start};
 requestAnimationFrame(loop);
 })();
