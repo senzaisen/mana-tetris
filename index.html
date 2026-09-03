@@ -33,7 +33,7 @@ canvas{display:block;width:100%;height:auto;background:#0d0d14;border-radius:16p
 <div id="hud"><div class="pill">SCORE <b id="score">0</b></div><div class="pill">LINES <b id="lines">0</b></div><div class="pill">LEVEL <b id="level">1</b></div><div class="pill">BEST <b id="best">0</b></div></div>
 <div id="stage">
 <canvas id="cv" width="480" height="600"></canvas>
-<div id="overlay"><h2 id="ovTitle">MANA TETRIS</h2><p id="ovText">PC: ←/→ move · ↓ soft drop · ↑ rotate · space hard drop · C hold<br>Phone: swipe / tap board, or buttons below</p><button class="btn" id="playBtn">PLAY</button></div>
+<div id="overlay"><h2 id="ovTitle">MANA TETRIS</h2><p id="ovText">PC: ←/→ move · ↓ soft drop · ↑ rotate · space hard drop · C hold<br>Phone: swipe / tap board, or buttons below<br>Twist T into tight slots — T-spins pay big</p><button class="btn" id="playBtn">PLAY</button></div>
 </div>
 <div id="touch">
 <button id="tL">◀</button><button id="tR">▶</button><button id="tRot">⟳</button><button id="tDown">▼</button>
@@ -54,7 +54,7 @@ O:[[1,1],[1,1]],
 S:[[0,1,1],[1,1,0],[0,0,0]],
 T:[[0,1,0],[1,1,1],[0,0,0]],
 Z:[[1,1,0],[0,1,1],[0,0,0]]};
-const G={state:'title',board:[],bag:[],cur:null,next:null,hold:null,canHold:true,score:0,lines:0,level:1,best:+(localStorage.getItem('manaTetrisBest')||0),dropAcc:0,paused:false,flash:[],msg:0,msgText:'',lockT:0,combo:-1,b2b:false,popups:[]};
+const G={state:'title',board:[],bag:[],cur:null,next:null,hold:null,canHold:true,score:0,lines:0,level:1,best:+(localStorage.getItem('manaTetrisBest')||0),dropAcc:0,paused:false,flash:[],msg:0,msgText:'',lockT:0,combo:-1,b2b:false,popups:[],lastSpin:false};
 document.getElementById('best').textContent=G.best;
 const ov=document.getElementById('overlay'),ovT=document.getElementById('ovTitle'),ovX=document.getElementById('ovText');
 function emptyBoard(){return Array.from({length:ROWS},()=>Array(COLS).fill(null));}
@@ -62,8 +62,8 @@ function refillBag(){G.bag=['I','O','T','S','Z','J','L'];for(let i=G.bag.length-
 function takePiece(){if(!G.bag.length)refillBag();const t=G.bag.pop();return {t,m:SHAPES[t].map(r=>r.slice()),x:3,y:t==='I'?-1:0};}
 function rot(m){const n=m.length,r=[];for(let i=0;i<n;i++){r.push([]);for(let j=0;j<n;j++)r[i][j]=m[n-1-j][i];}return r;}
 function collide(m,px,py){for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++){if(!m[r][c])continue;const x=px+c,y=py+r;if(x<0||x>=COLS||y>=ROWS)return true;if(y>=0&&G.board[y][x])return true;}return false;}
-function spawn(){G.cur=G.next||takePiece();G.next=takePiece();G.canHold=true;if(collide(G.cur.m,G.cur.x,G.cur.y)){gameOver();}}
-function reset(){G.board=emptyBoard();G.bag=[];G.next=null;G.hold=null;G.cur=null;G.score=0;G.lines=0;G.level=1;G.dropAcc=0;G.flash=[];G.lockT=0;G.combo=-1;G.b2b=false;G.popups=[];refillBag();G.next=takePiece();spawn();updateHUD();}
+function spawn(){G.cur=G.next||takePiece();G.next=takePiece();G.canHold=true;G.lastSpin=false;if(collide(G.cur.m,G.cur.x,G.cur.y)){gameOver();}}
+function reset(){G.board=emptyBoard();G.bag=[];G.next=null;G.hold=null;G.cur=null;G.score=0;G.lines=0;G.level=1;G.dropAcc=0;G.flash=[];G.lockT=0;G.combo=-1;G.b2b=false;G.popups=[];G.lastSpin=false;refillBag();G.next=takePiece();spawn();updateHUD();}
 function start(){reset();G.state='play';G.paused=false;ov.classList.add('hidden');}
 function gameOver(){G.state='over';if(G.score>G.best){G.best=G.score;localStorage.setItem('manaTetrisBest',G.best);}document.getElementById('best').textContent=G.best;ovT.textContent='TOPPED OUT';ovX.innerHTML='score <b>'+G.score+'</b> · lines <b>'+G.lines+'</b> · level <b>'+G.level+'</b><br>tap PLAY to stack again';ov.classList.remove('hidden');try{sfx(330,0.15,'sawtooth');setTimeout(()=>sfx(233,0.15,'sawtooth'),160);setTimeout(()=>sfx(155,0.3,'sawtooth'),320);}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.state==='play'&&!G.paused)togglePause();});
@@ -78,25 +78,38 @@ function updateHUD(){document.getElementById('score').textContent=G.score;docume
 function lockPiece(){const {m,x,y,t}=G.cur;for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++){if(m[r][c]&&y+r>=0)G.board[y+r][x+c]=t;}
   let cleared=0;const clearedRows=[];
   for(let r=ROWS-1;r>=0;r--){if(G.board[r].every(v=>v)){clearedRows.push(r);G.board.splice(r,1);G.board.unshift(Array(COLS).fill(null));cleared++;r++;}}
+  const tspin=(G.cur.t==='T'&&G.lastSpin&&tspinCorners()>=3);
+  if(tspin&&cleared===0){
+    const pts=400*G.level;
+    G.score+=pts;
+    G.popups.push({text:'T-SPIN +'+pts,x:160,y:200,t:1.4});
+    sfx(700,0.12,'square');
+  }
   if(cleared){
     G.combo++;
     const isTetris=cleared===4;
     const wasB2B=G.b2b;
-    let pts=[0,100,300,500,800][cleared]*G.level;
-    if(isTetris&&wasB2B)pts=Math.floor(pts*1.5);
-    G.b2b=isTetris?true:false;
+    const difficult=isTetris||tspin;
+    let pts=(tspin?[0,800,1200,1600][cleared]:[0,100,300,500,800][cleared])*G.level;
+    if(difficult&&wasB2B)pts=Math.floor(pts*1.5);
     if(G.combo>0)pts+=50*G.combo*G.level;
+    let label;
+    if(tspin)label=(cleared===1?'T-SPIN SINGLE':cleared===2?'T-SPIN DOUBLE':'T-SPIN TRIPLE')+(difficult&&wasB2B?' B2B':'');
+    else label=(cleared===1?'SINGLE':cleared===2?'DOUBLE':cleared===3?'TRIPLE':'TETRIS')+(difficult&&wasB2B?' B2B':'');
+    label+=' +'+pts;
+    if(cleared>0)G.b2b=difficult?true:false;
     G.score+=pts;G.lines+=cleared;
-    const label=cleared===1?'SINGLE':cleared===2?'DOUBLE':cleared===3?'TRIPLE':'TETRIS'+(isTetris&&wasB2B?' B2B':'');
-    G.popups.push({text:label+' +'+pts,x:160,y:200,t:1.4});
+    G.popups.push({text:label,x:160,y:200,t:1.4});
     for(const rr of clearedRows)for(let i=0;i<10;i++)G.flash.push({x:BX+Math.random()*COLS*CELL,y:BY+rr*CELL+15,vx:(Math.random()-0.5)*260,vy:-Math.random()*220,l:0.5});
     const nl=Math.floor(G.lines/10)+1;if(nl>G.level){G.level=nl;G.msg=2;G.msgText='LEVEL '+nl;}
     sfx(300+cleared*150,0.12,'square');
   } else G.combo=-1;
   G.lockT=0;updateHUD();spawn();}
 function hardDrop(){if(G.state!=='play'||G.paused||!G.cur)return;let d=0;while(!collide(G.cur.m,G.cur.x,G.cur.y+1)){G.cur.y++;d++;}G.score+=d*2;lockPiece();sfx(150,0.08,'sawtooth');updateHUD();}
-function tryMove(dx){if(!G.cur)return;if(!collide(G.cur.m,G.cur.x+dx,G.cur.y)){G.cur.x+=dx;G.lockT=0;}}
-function tryRot(){if(!G.cur||G.cur.t==='O')return;const r=rot(G.cur.m);for(const k of [0,-1,1,-2,2]){if(!collide(r,G.cur.x+k,G.cur.y)){G.cur.m=r;G.cur.x+=k;G.lockT=0;sfx(500,0.05,'square');return;}}}
+function tryMove(dx){if(!G.cur)return;if(!collide(G.cur.m,G.cur.x+dx,G.cur.y)){G.cur.x+=dx;G.lockT=0;G.lastSpin=false;}}
+function tryRot(){if(!G.cur||G.cur.t==='O')return;const r=rot(G.cur.m);for(const k of [0,-1,1,-2,2]){if(!collide(r,G.cur.x+k,G.cur.y)){G.cur.m=r;G.cur.x+=k;G.lockT=0;G.lastSpin=true;sfx(500,0.05,'square');return;}}}
+function tspinCorners(){const {x,y}=G.cur;let n=0;const pts=[[x,y],[x+2,y],[x,y+2],[x+2,y+2]];
+for(const pt of pts){const cx=pt[0],cy=pt[1];if(cx<0||cx>=COLS||cy>=ROWS)n++;else if(cy>=0&&G.board[cy][cx])n++;}return n;}
 function hold(){if(!G.canHold||!G.cur)return;if(!G.hold){G.hold=G.cur.t;spawn();}else{const t=G.hold;G.hold=G.cur.t;G.cur={t,m:SHAPES[t].map(row=>row.slice()),x:3,y:t==='I'?-1:0};if(collide(G.cur.m,G.cur.x,G.cur.y)){gameOver();return;}}G.canHold=false;sfx(400,0.07,'sine');}
 function dropInterval(){return Math.max(70,780-(G.level-1)*70);}
 let AC=null;function sfx(f,d,type){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type=type||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.07,AC.currentTime);g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d);}catch(e){}}
@@ -115,7 +128,7 @@ document.getElementById('playBtn').onclick=start;
 function bindHold(el,fn){let iv=null,lastTouch=0;const go=e=>{e.preventDefault();if(e.type==='touchstart')lastTouch=Date.now();fn();iv=setInterval(fn,110);};const mouseGo=e=>{if(Date.now()-lastTouch<600)return;go(e);};const stop=()=>{clearInterval(iv);iv=null;};el.addEventListener('touchstart',go,{passive:false});el.addEventListener('touchend',stop);el.addEventListener('touchcancel',stop);el.addEventListener('mousedown',mouseGo);el.addEventListener('mouseup',stop);el.addEventListener('mouseleave',stop);}
 bindHold(document.getElementById('tL'),()=>{if(G.state==='play'&&!G.paused)tryMove(-1);});
 bindHold(document.getElementById('tR'),()=>{if(G.state==='play'&&!G.paused)tryMove(1);});
-bindHold(document.getElementById('tDown'),()=>{if(G.state==='play'&&!G.paused&&G.cur&&!collide(G.cur.m,G.cur.x,G.cur.y+1)){G.cur.y++;G.score+=1;}});
+bindHold(document.getElementById('tDown'),()=>{if(G.state==='play'&&!G.paused&&G.cur&&!collide(G.cur.m,G.cur.x,G.cur.y+1)){G.cur.y++;G.lastSpin=false;G.score+=1;}});
 document.getElementById('tRot').addEventListener('touchstart',e=>{e.preventDefault();if(G.state==='play'&&!G.paused)tryRot();},{passive:false});
 document.getElementById('tRot').onclick=()=>{if(G.state==='play'&&!G.paused)tryRot();};
 document.getElementById('tDrop').onclick=hardDrop;
@@ -160,7 +173,7 @@ let last=0;function loop(ts){const dt=Math.min(0.05,(ts-last)/1000||0.016);last=
     const grounded=collide(G.cur.m,G.cur.x,G.cur.y+1);
     if(grounded){G.lockT+=dt;if(G.lockT>=0.45){lockPiece();if(G.state!=='play'){try{render();}catch(e){}requestAnimationFrame(loop);return;}}}
     else{G.lockT=0;const iv=(keys.has('ArrowDown')?38:dropInterval())/1000;G.dropAcc+=dt;
-      while(G.dropAcc>=iv){G.dropAcc-=iv;if(!collide(G.cur.m,G.cur.x,G.cur.y+1)){G.cur.y++;if(keys.has('ArrowDown'))G.score+=1;}else{lockPiece();if(G.state!=='play')break;}}}
+      while(G.dropAcc>=iv){G.dropAcc-=iv;if(!collide(G.cur.m,G.cur.x,G.cur.y+1)){G.cur.y++;G.lastSpin=false;if(keys.has('ArrowDown'))G.score+=1;}else{lockPiece();if(G.state!=='play')break;}}}
   }
   for(const p of G.flash){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=900*dt;p.l-=dt;}
   G.flash=G.flash.filter(p=>p.l>0);
