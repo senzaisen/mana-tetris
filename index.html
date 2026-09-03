@@ -147,6 +147,7 @@ function render(){
   ctx.fillStyle='#9a9ab0';ctx.font='12px system-ui';ctx.fillText('goal: clear lines,',336,420);ctx.fillText('level up each 10',336,438);
   ctx.fillStyle='#2dd4bf';ctx.font='bold 13px system-ui';ctx.fillText('BEST '+G.best,336,470);
   if(G.msg>0&&G.state==='play'){G.msg-=0.016;ctx.fillStyle='#fbbf24';ctx.font='bold 30px system-ui';ctx.textAlign='center';ctx.fillText(G.msgText,160,300);}
+  if(location.search.indexOf('dbg')>=0){const nb=G.board.flat().filter(Boolean).length;ctx.fillStyle='#fff';ctx.font='bold 13px monospace';ctx.textAlign='left';ctx.fillText('st='+G.state+' cur='+(G.cur?G.cur.t+' x'+G.cur.x+' y'+G.cur.y:'none')+' nb='+nb+' sc='+Math.floor(G.score)+' lv='+G.level,12,H-14);}
   for(const p of G.popups){ctx.globalAlpha=Math.min(1,p.t);ctx.fillStyle='#fbbf24';ctx.font='bold 19px system-ui';ctx.textAlign='center';ctx.fillText(p.text,p.x,p.y);ctx.globalAlpha=1;}
   if(G.combo>0&&G.state==='play'){ctx.fillStyle='#2dd4bf';ctx.font='bold 13px system-ui';ctx.textAlign='left';ctx.fillText('COMBO x'+G.combo,336,494);}
   for(const p of G.flash){ctx.globalAlpha=Math.max(0,p.l*2);ctx.fillStyle='#fff';ctx.fillRect(p.x,p.y,5,5);ctx.globalAlpha=1;}
