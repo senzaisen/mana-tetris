@@ -167,7 +167,7 @@ let last=0;function loop(ts){const dt=Math.min(0.05,(ts-last)/1000||0.016);last=
   for(const p of G.popups){p.y-=28*dt;p.t-=dt;}
   G.popups=G.popups.filter(p=>p.t>0);
   }catch(e){try{window.__err='L:'+String(e&&e.message||e).slice(0,120);}catch(_){}}
-  try{render();}catch(e){try{window.__err='R:'+String(e&&e.message||e).slice(0,120);}catch(_){}
+  try{render();window.__err='';}catch(e){try{window.__err='R:'+String(e&&e.message||e).slice(0,120);}catch(_){}
     try{ctx.fillStyle='#0d0d14';ctx.fillRect(0,0,480,600);}catch(_){}}
   if(window.__err){try{ctx.fillStyle='#ff5555';ctx.font='bold 13px monospace';ctx.textAlign='left';ctx.fillText('ERR '+window.__err,12,20);}catch(_){}}
   requestAnimationFrame(loop);}
