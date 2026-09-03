@@ -20,7 +20,11 @@ canvas{display:block;width:100%;height:auto;background:#0d0d14;border-radius:16p
 #overlay.hidden{display:none}
 #overlay h2{margin:0;font-size:26px}
 #overlay p{color:var(--mut);margin:0;max-width:340px}
-.btn{background:var(--teal);color:#06251f;border:0;border-radius:999px;padding:12px 28px;font-size:16px;font-weight:800;cursor:pointer}
+.btn{background:var(--teal);color:#06251f;border:0;border-radius:999px;padding:12px 28px;font-size:16px;font-weight:800;cursor:pointer;margin:4px}
+.btn.ghost{background:#2a2a3d;color:var(--ink)}
+#menuBtns{display:flex;flex-direction:column;gap:2px;align-items:center}
+#menuBtns .btn{min-width:220px}
+#menuBtns small{color:var(--mut);font-size:12px;margin-top:6px}
 #touch{max-width:480px;margin:10px auto 0;display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
 #touch button{background:var(--card);color:var(--ink);border:1px solid #33334a;border-radius:14px;padding:13px 0;font-size:19px;font-weight:800;touch-action:manipulation}
 #touch button:active{background:var(--teal);color:#06251f}
@@ -30,10 +34,10 @@ canvas{display:block;width:100%;height:auto;background:#0d0d14;border-radius:16p
 </style>
 <header><h1>MANA <span>TETRIS</span></h1><p class="sub">stack · clear · survive — how many lines can you clear?</p></header>
 <div id="wrap">
-<div id="hud"><div class="pill">SCORE <b id="score">0</b></div><div class="pill">LINES <b id="lines">0</b></div><div class="pill">LEVEL <b id="level">1</b></div><div class="pill">BEST <b id="best">0</b></div><div class="pill" id="modePill" style="cursor:pointer">MODE <b id="modeName">NORMAL</b></div></div>
+<div id="hud"><div class="pill">SCORE <b id="score">0</b></div><div class="pill">LINES <b id="lines">0</b></div><div class="pill">LEVEL <b id="level">1</b></div><div class="pill">BEST <b id="best">0</b></div><div class="pill" id="timePill" style="display:none">TIME <b id="time">0:00.0</b></div><div class="pill" id="modePill" style="cursor:pointer">MODE <b id="modeName">NORMAL</b></div></div>
 <div id="stage">
 <canvas id="cv" width="480" height="600"></canvas>
-<div id="overlay"><h2 id="ovTitle">MANA TETRIS</h2><p id="ovText">PC: ←/→ move · ↓ soft drop · ↑ rotate · space hard drop · C hold<br>Phone: swipe ↓ soft drop · double swipe ↓ hard drop · tap board to spin<br>TACTILE mode: tap ◀ ⟲ · tap ▶ ⟳ · tap piece 180 · swipe ↕ move/drop<br>Twist T into tight slots — T-spins pay big</p><button class="btn" id="playBtn">PLAY</button></div>
+<div id="overlay"><h2 id="ovTitle">MANA TETRIS</h2><p id="ovText">Pick a mode, Master.</p><div id="menuBtns"><button class="btn" data-m="free">FREESTYLE</button><small>endless · levels · top out ends it</small><button class="btn" data-m="sprint">40 LINES</button><small>sprint · fixed speed · beat the clock</small><button class="btn" data-m="cheese">CHEESE RACE</button><small>10 garbage rows · clear 20 lines fast</small></div><button class="btn" id="playBtn" style="display:none">PLAY</button><button class="btn ghost" id="menuBtn" style="display:none">MENU</button></div>
 </div>
 <div id="touch">
 <button id="tL">◀</button><button id="tR">▶</button><button id="tCCW">⟲</button><button id="tRot">⟳</button><button id="t180">180</button><button id="tDown">▼</button>
@@ -45,7 +49,7 @@ canvas{display:block;width:100%;height:auto;background:#0d0d14;border-radius:16p
 (()=>{"use strict";
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const COLS=10,ROWS=20;let CELL=30,BX=10,BY=10,H=600,gridCache=null;
-const COLORS={I:'#22d3ee',O:'#facc15',T:'#c084fc',S:'#4ade80',Z:'#f87171',J:'#60a5fa',L:'#fb923c'};
+const COLORS={I:'#22d3ee',O:'#facc15',T:'#c084fc',S:'#4ade80',Z:'#f87171',J:'#60a5fa',L:'#fb923c',X:'#6b7280'};
 const SHAPES={
 I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
 J:[[1,0,0],[1,1,1],[0,0,0]],
@@ -54,7 +58,7 @@ O:[[1,1],[1,1]],
 S:[[0,1,1],[1,1,0],[0,0,0]],
 T:[[0,1,0],[1,1,1],[0,0,0]],
 Z:[[1,1,0],[0,1,1],[0,0,0]]};
-const G={state:'title',board:[],bag:[],cur:null,next:null,hold:null,canHold:true,score:0,lines:0,level:1,best:+(localStorage.getItem('manaTetrisBest')||0),dropAcc:0,paused:false,flash:[],msg:0,msgText:'',lockT:0,combo:-1,b2b:false,popups:[],lastSpin:false,mode:'normal'};
+const G={state:'title',board:[],bag:[],cur:null,next:null,hold:null,canHold:true,score:0,lines:0,level:1,best:+(localStorage.getItem('manaTetrisBest')||0),dropAcc:0,paused:false,flash:[],msg:0,msgText:'',lockT:0,combo:-1,b2b:false,popups:[],lastSpin:false,mode:'normal',fmode:'free',timer:0,goal:Infinity,fixedIv:null,hudT:0,best40:+(localStorage.getItem('manaTetris40')||0),bestCheese:+(localStorage.getItem('manaTetrisCheese')||0)};
 document.getElementById('best').textContent=G.best;
 const ov=document.getElementById('overlay'),ovT=document.getElementById('ovTitle'),ovX=document.getElementById('ovText');
 function setLayout(){
@@ -77,9 +81,34 @@ function rot(m){const n=m.length,r=[];for(let i=0;i<n;i++){r.push([]);for(let j=
 function rotCCW(m){const n=m.length,r=[];for(let i=0;i<n;i++){r.push([]);for(let j=0;j<n;j++)r[i][j]=m[j][n-1-i];}return r;}
 function collide(m,px,py){for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++){if(!m[r][c])continue;const x=px+c,y=py+r;if(x<0||x>=COLS||y>=ROWS)return true;if(y>=0&&G.board[y][x])return true;}return false;}
 function spawn(){G.cur=G.next||takePiece();G.next=takePiece();G.canHold=true;G.lastSpin=false;G.dx=G.cur.x;G.dy=G.cur.y;if(collide(G.cur.m,G.cur.x,G.cur.y)){gameOver();}}
-function reset(){G.board=emptyBoard();G.bag=[];G.next=null;G.hold=null;G.cur=null;G.score=0;G.lines=0;G.level=1;G.dropAcc=0;G.flash=[];G.lockT=0;G.combo=-1;G.b2b=false;G.popups=[];G.lastSpin=false;refillBag();G.next=takePiece();spawn();updateHUD();}
-function start(){reset();G.state='play';G.paused=false;ov.classList.add('hidden');}
-function gameOver(){G.state='over';if(G.score>G.best){G.best=G.score;localStorage.setItem('manaTetrisBest',G.best);}document.getElementById('best').textContent=G.best;ovT.textContent='TOPPED OUT';ovX.innerHTML='score <b>'+G.score+'</b> · lines <b>'+G.lines+'</b> · level <b>'+G.level+'</b><br>tap PLAY to stack again';ov.classList.remove('hidden');try{sfx(330,0.15,'sawtooth');setTimeout(()=>sfx(233,0.15,'sawtooth'),160);setTimeout(()=>sfx(155,0.3,'sawtooth'),320);}catch(e){}}
+function fmtTime(s){const m=Math.floor(s/60),ss=(s%60);return m+':'+(ss<10?'0':'')+ss.toFixed(1);}
+function showTitle(){G.state='title';G.paused=false;ovT.textContent='MANA TETRIS';ovX.textContent='Pick a mode, Master.';
+document.getElementById('menuBtns').style.display='flex';document.getElementById('playBtn').style.display='none';document.getElementById('menuBtn').style.display='none';
+document.getElementById('timePill').style.display='none';ov.classList.remove('hidden');}
+function addCheese(n){let lastHole=-1;for(let i=0;i<n;i++){const row=Array(COLS).fill('X');let hole=(Math.random()*COLS)|0;if(hole===lastHole)hole=(hole+3)%COLS;lastHole=hole;row[hole]=null;G.board[ROWS-1-i]=row;}}
+function reset(fm){G.fmode=fm||G.fmode||'free';G.board=emptyBoard();G.bag=[];G.next=null;G.hold=null;G.cur=null;G.score=0;G.lines=0;G.level=1;G.dropAcc=0;G.flash=[];G.lockT=0;G.combo=-1;G.b2b=false;G.popups=[];G.lastSpin=false;G.timer=0;G.hudT=0;
+G.goal=G.fmode==='sprint'?40:(G.fmode==='cheese'?20:Infinity);
+G.fixedIv=G.fmode==='sprint'?140:null;
+if(G.fmode==='cheese')addCheese(10);
+document.getElementById('timePill').style.display=G.fmode==='free'?'none':'inline-block';
+updateTime();
+refillBag();G.next=takePiece();spawn();updateHUD();}
+function start(fm){reset(fm||G.fmode||'free');G.state='play';G.paused=false;
+document.getElementById('menuBtns').style.display='none';document.getElementById('playBtn').style.display='none';document.getElementById('menuBtn').style.display='none';
+ov.classList.add('hidden');}
+function endButtons(){document.getElementById('menuBtns').style.display='none';document.getElementById('playBtn').style.display='inline-block';document.getElementById('menuBtn').style.display='inline-block';ov.classList.remove('hidden');}
+function modeName(){return G.fmode==='sprint'?'40 LINES':(G.fmode==='cheese'?'CHEESE RACE':'FREESTYLE');}
+function win(){G.state='win';const t=G.timer;let nb=false;
+if(G.fmode==='sprint'&&(!G.best40||t<G.best40)){G.best40=t;try{localStorage.setItem('manaTetris40',t);}catch(e){}nb=true;}
+if(G.fmode==='cheese'&&(!G.bestCheese||t<G.bestCheese)){G.bestCheese=t;try{localStorage.setItem('manaTetrisCheese',t);}catch(e){}nb=true;}
+ovT.textContent=modeName()+' CLEAR!';ovX.innerHTML='time <b>'+fmtTime(t)+'</b>'+(nb?' — <b>NEW BEST!</b>':'')+'<br>score <b>'+G.score+'</b> · level <b>'+G.level+'</b>';
+try{sfx(523,0.12,'square');setTimeout(()=>sfx(659,0.12,'square'),130);setTimeout(()=>sfx(784,0.25,'square'),260);}catch(e){}
+endButtons();}
+function updateTime(){document.getElementById('time').textContent=fmtTime(G.timer);}
+function gameOver(){G.state='over';if(G.fmode==='free'&&G.score>G.best){G.best=G.score;try{localStorage.setItem('manaTetrisBest',G.best);}catch(e){}document.getElementById('best').textContent=G.best;}ovT.textContent=modeName()+' — TOPPED OUT';ovX.innerHTML='score <b>'+G.score+'</b> · lines <b>'+G.lines+'</b> · level <b>'+G.level+'</b>'+(G.fmode!=='free'?'<br>goal was <b>'+G.goal+' lines</b>':'')+'<br>tap AGAIN to retry';try{sfx(330,0.15,'sawtooth');setTimeout(()=>sfx(233,0.15,'sawtooth'),160);setTimeout(()=>sfx(155,0.3,'sawtooth'),320);}catch(e){}endButtons();}
+document.getElementById('playBtn').onclick=()=>start(G.fmode);
+document.getElementById('menuBtn').onclick=showTitle;
+document.querySelectorAll('#menuBtns .btn').forEach(b=>{b.onclick=()=>start(b.getAttribute('data-m'));});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.state==='play'&&!G.paused)togglePause();});
 // board taps: normal = CW rotate; tactile = left CCW / right CW / piece 180 / top-bar HOLD
 function canvasTap(px,py){
@@ -139,6 +168,7 @@ function lockPiece(){const {m,x,y,t}=G.cur;for(let r=0;r<m.length;r++)for(let c=
     label+=' +'+pts;
     if(cleared>0)G.b2b=difficult?true:false;
     G.score+=pts;G.lines+=cleared;
+    if(G.lines>=G.goal){updateHUD();win();return;}
     G.popups.push({text:label,x:BX+COLS*CELL/2,y:BY+60,t:1.4});
     for(const rr of clearedRows)for(let i=0;i<10;i++)G.flash.push({x:BX+Math.random()*COLS*CELL,y:BY+rr*CELL+15,vx:(Math.random()-0.5)*260,vy:-Math.random()*220,l:0.5});
     const nl=Math.floor(G.lines/10)+1;if(nl>G.level){G.level=nl;G.msg=2;G.msgText='LEVEL '+nl;}
@@ -152,7 +182,7 @@ function tryRot(){tryRotDir(1);}
 function tspinCorners(){const {x,y}=G.cur;let n=0;const pts=[[x,y],[x+2,y],[x,y+2],[x+2,y+2]];
 for(const pt of pts){const cx=pt[0],cy=pt[1];if(cx<0||cx>=COLS||cy>=ROWS)n++;else if(cy>=0&&G.board[cy][cx])n++;}return n;}
 function hold(){if(!G.canHold||!G.cur)return;if(!G.hold){G.hold=G.cur.t;spawn();}else{const t=G.hold;G.hold=G.cur.t;G.cur={t,m:SHAPES[t].map(row=>row.slice()),x:3,y:t==='I'?-1:0};G.dx=G.cur.x;G.dy=G.cur.y;G.lastSpin=false;if(collide(G.cur.m,G.cur.x,G.cur.y)){gameOver();return;}}G.canHold=false;sfx(400,0.07,'sine');}
-function dropInterval(){return Math.max(70,780-(G.level-1)*70);}
+function dropInterval(){if(G.fixedIv)return G.fixedIv;return Math.max(70,780-(G.level-1)*70);}
 let AC=null;function sfx(f,d,type){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type=type||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.07,AC.currentTime);g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d);}catch(e){}}
 window.__err='';window.addEventListener('error',e=>{try{window.__err=String((e&&e.message)||'err').slice(0,140);}catch(_){}});
 const keys=new Set();
@@ -160,11 +190,10 @@ addEventListener('keydown',e=>{if(e.repeat)return;keys.add(e.code);const k=e.cod
 if(k==='ArrowLeft')tryMove(-1);else if(k==='ArrowRight')tryMove(1);
 else if(k==='ArrowUp'||k==='KeyX')tryRotDir(1);else if(k==='KeyZ')tryRotDir(-1);else if(k==='KeyA')tryRotDir(2);else if(k==='ArrowDown'){}else if(k==='Space'){e.preventDefault();hardDrop();}
 else if(k==='KeyC')hold();else if(k==='KeyP'||k==='Escape')togglePause();
-else if(k==='Enter'&&G.state!=='play')start();});
+else if(k==='Enter'&&G.state!=='play')start(G.fmode);});
 addEventListener('keyup',e=>keys.delete(e.code));
 addEventListener('blur',()=>keys.clear());
 function togglePause(){if(G.state!=='play')return;G.paused=!G.paused;document.getElementById('tP').textContent=G.paused?'▶':'⏸';}
-document.getElementById('playBtn').onclick=start;
 // touch buttons (hold-to-repeat for left/right/down)
 function bindHold(el,fn,rate){let iv=null,lastTouch=0;const go=e=>{e.preventDefault();if(e.type==='touchstart')lastTouch=Date.now();fn();iv=setInterval(fn,rate||110);};const mouseGo=e=>{if(Date.now()-lastTouch<600)return;go(e);};const stop=()=>{clearInterval(iv);iv=null;};el.addEventListener('touchstart',go,{passive:false});el.addEventListener('touchend',stop);el.addEventListener('touchcancel',stop);el.addEventListener('mousedown',mouseGo);el.addEventListener('mouseup',stop);el.addEventListener('mouseleave',stop);}
 bindHold(document.getElementById('tL'),()=>{if(G.state==='play'&&!G.paused)tryMove(-1);},65);
@@ -194,7 +223,8 @@ function drawTopBar(){
   ctx.fillStyle='#f2f2f7';ctx.font='bold 26px system-ui';ctx.textAlign='center';
   ctx.fillText(String(G.score),240,54);
   ctx.fillStyle='#9a9ab0';ctx.font='12px system-ui';
-  ctx.fillText(G.lines+' lines · Lv '+G.level,240,76);
+  if(G.fmode==='free')ctx.fillText(G.lines+' lines · Lv '+G.level,240,76);
+  else ctx.fillText(G.lines+'/'+G.goal+' lines · '+fmtTime(G.timer),240,76);
   ctx.fillStyle='#2dd4bf';ctx.font='bold 12px system-ui';
   ctx.fillText('BEST '+G.best+(G.combo>0?' · COMBO x'+G.combo:''),240,98);
   ctx.fillStyle='#9a9ab0';ctx.font='11px system-ui';
@@ -241,13 +271,16 @@ function render(){
   for(const p of G.flash){ctx.globalAlpha=Math.max(0,p.l*2);ctx.fillStyle='#fff';ctx.fillRect(p.x,p.y,5,5);ctx.globalAlpha=1;}
   if(G.paused&&G.state==='play'){ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(0,0,480,H);ctx.fillStyle='#fff';ctx.font='bold 34px system-ui';ctx.textAlign='center';ctx.fillText('PAUSED',240,H/2);}
 }
-let last=0;function loop(ts){const dt=Math.min(0.05,(ts-last)/1000||0.016);last=ts;
+let last=0;function loop(ts){const dt=Math.max(0,Math.min(0.05,(ts-last)/1000||0.016));last=ts;
   try{
-  if(G.state==='play'&&!G.paused&&G.cur){
+  if(G.state==='play'&&!G.paused){
+    if(G.fmode!=='free'){G.timer+=dt;G.hudT+=dt;if(G.hudT>0.15){G.hudT=0;updateTime();}}
+    if(G.cur){
     const grounded=collide(G.cur.m,G.cur.x,G.cur.y+1);
     if(grounded){G.lockT+=dt;if(G.lockT>=0.45){lockPiece();if(G.state!=='play'){try{render();}catch(e){}requestAnimationFrame(loop);return;}}}
     else{G.lockT=0;const iv=(keys.has('ArrowDown')?38:dropInterval())/1000;G.dropAcc+=dt;
       while(G.dropAcc>=iv){G.dropAcc-=iv;if(!collide(G.cur.m,G.cur.x,G.cur.y+1)){G.cur.y++;if(keys.has('ArrowDown'))G.score+=1;}else{lockPiece();if(G.state!=='play')break;}}}
+  }
   }
   for(const p of G.flash){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=900*dt;p.l-=dt;}
   G.flash=G.flash.filter(p=>p.l>0);
@@ -261,7 +294,7 @@ let last=0;function loop(ts){const dt=Math.min(0.05,(ts-last)/1000||0.016);last=
     try{ctx.fillStyle='#0d0d14';ctx.fillRect(0,0,480,600);}catch(_){}}
   if(window.__err){try{ctx.fillStyle='#ff5555';ctx.font='bold 13px monospace';ctx.textAlign='left';ctx.fillText('ERR '+window.__err,12,20);}catch(_){}}
   requestAnimationFrame(loop);}
-window.__g={get state(){return G.state},get score(){return G.score},get lines(){return G.lines},get level(){return G.level},start:start};
+window.__g={get state(){return G.state},get score(){return G.score},get lines(){return G.lines},get level(){return G.level},get fmode(){return G.fmode},get timer(){return G.timer},start:start,showTitle:showTitle};
 requestAnimationFrame(loop);
 })();
 </script>
