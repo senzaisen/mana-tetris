@@ -21,7 +21,7 @@ canvas{display:block;width:100%;height:auto;background:#0d0d14;border-radius:16p
 #overlay h2{margin:0;font-size:26px}
 #overlay p{color:var(--mut);margin:0;max-width:340px}
 .btn{background:var(--teal);color:#06251f;border:0;border-radius:999px;padding:12px 28px;font-size:16px;font-weight:800;cursor:pointer}
-#touch{max-width:480px;margin:10px auto 0;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+#touch{max-width:480px;margin:10px auto 0;display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
 #touch button{background:var(--card);color:var(--ink);border:1px solid #33334a;border-radius:14px;padding:13px 0;font-size:19px;font-weight:800;touch-action:manipulation}
 #touch button:active{background:var(--teal);color:#06251f}
 #touch .wide{grid-column:span 2}
@@ -36,10 +36,10 @@ canvas{display:block;width:100%;height:auto;background:#0d0d14;border-radius:16p
 <div id="overlay"><h2 id="ovTitle">MANA TETRIS</h2><p id="ovText">PC: ←/→ move · ↓ soft drop · ↑ rotate · space hard drop · C hold<br>Phone: swipe / tap board, or buttons below<br>Twist T into tight slots — T-spins pay big</p><button class="btn" id="playBtn">PLAY</button></div>
 </div>
 <div id="touch">
-<button id="tL">◀</button><button id="tR">▶</button><button id="tRot">⟳</button><button id="tDown">▼</button>
-<button id="tDrop" class="wide">⤓ DROP</button><button id="tHold">HOLD</button><button id="tP">⏸</button>
+<button id="tL">◀</button><button id="tR">▶</button><button id="tCCW">⟲</button><button id="tRot">⟳</button><button id="t180">180</button><button id="tDown">▼</button>
+<button id="tDrop" class="wide">⤓ DROP</button><button id="tHold" class="wide">HOLD</button><button id="tP" class="wide">⏸</button>
 </div>
-<div class="keys"><code>←</code><code>→</code> move · <code>↑</code> rotate · <code>↓</code> soft drop · <code>space</code> hard drop · <code>C</code> hold · <code>P</code> pause</div>
+<div class="keys"><code>←</code><code>→</code> move · <code>↑</code>/<code>X</code> ⟳ · <code>Z</code> ⟲ · <code>A</code> 180 · <code>↓</code> drop · <code>space</code> hard drop · <code>C</code> hold · <code>P</code> pause</div>
 </div>
 <script>
 (()=>{"use strict";
@@ -61,6 +61,7 @@ function emptyBoard(){return Array.from({length:ROWS},()=>Array(COLS).fill(null)
 function refillBag(){G.bag=['I','O','T','S','Z','J','L'];for(let i=G.bag.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[G.bag[i],G.bag[j]]=[G.bag[j],G.bag[i]];}}
 function takePiece(){if(!G.bag.length)refillBag();const t=G.bag.pop();return {t,m:SHAPES[t].map(r=>r.slice()),x:3,y:t==='I'?-1:0};}
 function rot(m){const n=m.length,r=[];for(let i=0;i<n;i++){r.push([]);for(let j=0;j<n;j++)r[i][j]=m[n-1-j][i];}return r;}
+function rotCCW(m){const n=m.length,r=[];for(let i=0;i<n;i++){r.push([]);for(let j=0;j<n;j++)r[i][j]=m[j][n-1-i];}return r;}
 function collide(m,px,py){for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++){if(!m[r][c])continue;const x=px+c,y=py+r;if(x<0||x>=COLS||y>=ROWS)return true;if(y>=0&&G.board[y][x])return true;}return false;}
 function spawn(){G.cur=G.next||takePiece();G.next=takePiece();G.canHold=true;G.lastSpin=false;if(collide(G.cur.m,G.cur.x,G.cur.y)){gameOver();}}
 function reset(){G.board=emptyBoard();G.bag=[];G.next=null;G.hold=null;G.cur=null;G.score=0;G.lines=0;G.level=1;G.dropAcc=0;G.flash=[];G.lockT=0;G.combo=-1;G.b2b=false;G.popups=[];G.lastSpin=false;refillBag();G.next=takePiece();spawn();updateHUD();}
@@ -107,7 +108,8 @@ function lockPiece(){const {m,x,y,t}=G.cur;for(let r=0;r<m.length;r++)for(let c=
   G.lockT=0;updateHUD();spawn();}
 function hardDrop(){if(G.state!=='play'||G.paused||!G.cur)return;let d=0;while(!collide(G.cur.m,G.cur.x,G.cur.y+1)){G.cur.y++;d++;}G.score+=d*2;lockPiece();sfx(150,0.08,'sawtooth');updateHUD();}
 function tryMove(dx){if(!G.cur)return;if(!collide(G.cur.m,G.cur.x+dx,G.cur.y)){G.cur.x+=dx;G.lockT=0;G.lastSpin=false;}}
-function tryRot(){if(!G.cur||G.cur.t==='O')return;const r=rot(G.cur.m);for(const k of [0,-1,1,-2,2]){if(!collide(r,G.cur.x+k,G.cur.y)){G.cur.m=r;G.cur.x+=k;G.lockT=0;G.lastSpin=true;sfx(500,0.05,'square');return;}}}
+function tryRotDir(d){if(!G.cur||G.cur.t==='O')return;let r=G.cur.m;const n=d===2?2:1;for(let i=0;i<n;i++)r=(d===-1?rotCCW(r):rot(r));for(const k of [0,-1,1,-2,2]){if(!collide(r,G.cur.x+k,G.cur.y)){G.cur.m=r;G.cur.x+=k;G.lockT=0;G.lastSpin=true;sfx(500,0.05,'square');return;}}}
+function tryRot(){tryRotDir(1);}
 function tspinCorners(){const {x,y}=G.cur;let n=0;const pts=[[x,y],[x+2,y],[x,y+2],[x+2,y+2]];
 for(const pt of pts){const cx=pt[0],cy=pt[1];if(cx<0||cx>=COLS||cy>=ROWS)n++;else if(cy>=0&&G.board[cy][cx])n++;}return n;}
 function hold(){if(!G.canHold||!G.cur)return;if(!G.hold){G.hold=G.cur.t;spawn();}else{const t=G.hold;G.hold=G.cur.t;G.cur={t,m:SHAPES[t].map(row=>row.slice()),x:3,y:t==='I'?-1:0};if(collide(G.cur.m,G.cur.x,G.cur.y)){gameOver();return;}}G.canHold=false;sfx(400,0.07,'sine');}
@@ -117,7 +119,7 @@ window.__err='';window.addEventListener('error',e=>{try{window.__err=String((e&&
 const keys=new Set();
 addEventListener('keydown',e=>{if(e.repeat)return;keys.add(e.code);const k=e.code;
 if(k==='ArrowLeft')tryMove(-1);else if(k==='ArrowRight')tryMove(1);
-else if(k==='ArrowUp')tryRot();else if(k==='ArrowDown'){}else if(k==='Space'){e.preventDefault();hardDrop();}
+else if(k==='ArrowUp'||k==='KeyX')tryRotDir(1);else if(k==='KeyZ')tryRotDir(-1);else if(k==='KeyA')tryRotDir(2);else if(k==='ArrowDown'){}else if(k==='Space'){e.preventDefault();hardDrop();}
 else if(k==='KeyC')hold();else if(k==='KeyP'||k==='Escape')togglePause();
 else if(k==='Enter'&&G.state!=='play')start();});
 addEventListener('keyup',e=>keys.delete(e.code));
@@ -129,8 +131,12 @@ function bindHold(el,fn){let iv=null,lastTouch=0;const go=e=>{e.preventDefault()
 bindHold(document.getElementById('tL'),()=>{if(G.state==='play'&&!G.paused)tryMove(-1);});
 bindHold(document.getElementById('tR'),()=>{if(G.state==='play'&&!G.paused)tryMove(1);});
 bindHold(document.getElementById('tDown'),()=>{if(G.state==='play'&&!G.paused&&G.cur&&!collide(G.cur.m,G.cur.x,G.cur.y+1)){G.cur.y++;G.lastSpin=false;G.score+=1;}});
-document.getElementById('tRot').addEventListener('touchstart',e=>{e.preventDefault();if(G.state==='play'&&!G.paused)tryRot();},{passive:false});
-document.getElementById('tRot').onclick=()=>{if(G.state==='play'&&!G.paused)tryRot();};
+document.getElementById('tRot').addEventListener('touchstart',e=>{e.preventDefault();if(G.state==='play'&&!G.paused)tryRotDir(1);},{passive:false});
+document.getElementById('tRot').onclick=()=>{if(G.state==='play'&&!G.paused)tryRotDir(1);};
+document.getElementById('tCCW').addEventListener('touchstart',e=>{e.preventDefault();if(G.state==='play'&&!G.paused)tryRotDir(-1);},{passive:false});
+document.getElementById('tCCW').onclick=()=>{if(G.state==='play'&&!G.paused)tryRotDir(-1);};
+document.getElementById('t180').addEventListener('touchstart',e=>{e.preventDefault();if(G.state==='play'&&!G.paused)tryRotDir(2);},{passive:false});
+document.getElementById('t180').onclick=()=>{if(G.state==='play'&&!G.paused)tryRotDir(2);};
 document.getElementById('tDrop').onclick=hardDrop;
 document.getElementById('tHold').onclick=()=>{if(G.state==='play'&&!G.paused)hold();};
 document.getElementById('tP').onclick=togglePause;
